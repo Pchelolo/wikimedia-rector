@@ -10,10 +10,10 @@ use Wikimedia\Rector\Services\DeprecationParser;
 return static function ( ContainerConfigurator $containerConfigurator ) : void {
 	$parameters = $containerConfigurator->parameters();
 	$parameters->set ( Option::AUTOLOAD_PATHS, [
-	    'includes/',
+	    '.',
 	] );
 	$services = $containerConfigurator->services();
-	$services
+	/*$services
         ->set( DeprecationParser::class )
         ->call( 'configure', [[
             DeprecationParser::REMOVE_SOFT_DEPRECATED => true,
@@ -21,5 +21,6 @@ return static function ( ContainerConfigurator $containerConfigurator ) : void {
         ->autowire();
 	$services->set( RemoveDeprecatedClassesRector::class );
 	$services->set( RemoveDeprecatedMethodsRector::class );
-	$services->set( RemoveDeprecatedPropertiesRector::class );
+	$services->set( RemoveDeprecatedPropertiesRector::class );*/
+    $services->set( \Wikimedia\Rector\Rectors\UserToUserIndetityRector::class );
 };
