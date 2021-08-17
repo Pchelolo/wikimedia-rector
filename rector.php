@@ -19,6 +19,7 @@ return static function ( ContainerConfigurator $containerConfigurator ) : void {
         'includes/',
         'extensions/Echo/includes/',
 	] );
+    $parameters->set(Option::AUTO_IMPORT_NAMES, true);
 	$services = $containerConfigurator->services();
 
 	/*$services

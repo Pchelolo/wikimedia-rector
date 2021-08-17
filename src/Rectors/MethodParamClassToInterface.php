@@ -22,6 +22,7 @@ use Rector\Core\NodeAnalyzer\ParamAnalyzer;
 use Rector\Core\Rector\AbstractRector;
 use Rector\Core\Reflection\ReflectionResolver;
 use Rector\PHPStanStaticTypeMapper\ValueObject\TypeKind;
+use Rector\TypeDeclaration\TypeInferer\PropertyTypeInferer;
 use Symplify\RuleDocGenerator\ValueObject\CodeSample\CodeSample;
 use Symplify\RuleDocGenerator\ValueObject\RuleDefinition;
 
@@ -46,14 +47,19 @@ class MethodParamClassToInterface extends AbstractRector implements Configurable
     /** @var ReflectionResolver */
     private $reflectionResolver;
 
+    /** @var PropertyTypeInferer */
+    private $propertyTypeInferer;
+
     public function __construct(
         ParamAnalyzer $paramAnalyzer,
         ReflectionProvider $reflectionProvider,
-        ReflectionResolver $reflectionResolver
+        ReflectionResolver $reflectionResolver,
+        PropertyTypeInferer $propertyTypeInferer
     ) {
         $this->paramAnalyzer = $paramAnalyzer;
         $this->reflectionProvider = $reflectionProvider;
         $this->reflectionResolver = $reflectionResolver;
+        $this->propertyTypeInferer = $propertyTypeInferer;
     }
 
     public function configure( array $configuration ): void {
@@ -95,6 +101,9 @@ class MethodParamClassToInterface extends AbstractRector implements Configurable
             if ( $this->passedToMethodsExpectingClass( $method, $this->getName( $param ) ) ) {
                 continue;
             }
+            if ( $this->assignedToClassTypedProperty( $method, $this->getName( $param ) ) ) {
+                continue;
+            }
             // Can be refactored!
             $this->refactorParamDocBlock( $param, $method );
             $this->refactorParamTypeHint( $param );
@@ -131,8 +140,11 @@ class MethodParamClassToInterface extends AbstractRector implements Configurable
         return false;
     }
 
-    private function passedToMethodsExpectingClass( Node $method, string $paramName ) {
-        foreach ( $this->betterNodeFinder->findInstancesOf( $method, [ Node\Expr\MethodCall::class ] ) as $call ) {
+    private function passedToMethodsExpectingClass( ClassMethod $method, string $paramName ) {
+        foreach ( $this->betterNodeFinder->findInstancesOf(
+            $method,
+            [ Node\Expr\MethodCall::class, Node\Expr\New_::class, Node\Expr\StaticCall::class ] ) as $call
+        ) {
             $paramPositions = [];
             foreach ( $call->args as $index => $arg ) {
                 if ( $this->isName( $arg->value, $paramName ) ) {
@@ -142,12 +154,24 @@ class MethodParamClassToInterface extends AbstractRector implements Configurable
             if ( !$paramPositions ) {
                 continue;
             }
-            $methodCalledOn = $this->reflectionResolver->resolveMethodReflectionFromMethodCall( $call );
+            if ( $call instanceof Node\Expr\MethodCall ) {
+                $methodCalledOn = $this->reflectionResolver->resolveMethodReflectionFromMethodCall( $call );
+            } elseif ( $call instanceof Node\Expr\New_ ) {
+                $methodCalledOn = $this->reflectionResolver->resolveMethodReflectionFromNew( $call );
+            } elseif ( $call instanceof Node\Expr\StaticCall ) {
+                $methodCalledOn = $this->reflectionResolver->resolveMethodReflectionFromStaticCall( $call );
+            } else {
+                throw new ShouldNotHappenException();
+            }
+            if ( !$methodCalledOn ) {
+                // Could not reflect the types. Skip this one.
+                return true;
+            }
             $parameters = ParametersAcceptorSelector::selectSingle( $methodCalledOn->getVariants() );
             foreach ( $parameters->getParameters() as $index => $param ) {
                 /** @var ParameterReflection $param */
                 if ( in_array( $index, $paramPositions ) &&
-                    $param->getType()->equals( new ObjectType( $this->replaceClass ) )
+                    !$param->getType()->isSuperTypeOf( new ObjectType( $this->replaceWithInterface ) )->yes()
                 ) {
                     return true;
                 }
@@ -156,11 +180,35 @@ class MethodParamClassToInterface extends AbstractRector implements Configurable
         return false;
     }
 
+    private function assignedToClassTypedProperty( ClassMethod $method, string $paramName ) {
+        $assignments = $this->betterNodeFinder->find(
+            $method,
+            function ( Node $node ) use ( $paramName ) {
+                return $node instanceof Node\Expr\Assign &&
+                    $node->expr instanceof Node\Expr\Variable &&
+                    $this->isName( $node->expr, $paramName );
+            }
+        );
+
+        if ( !$assignments ) {
+            return false;
+        }
+
+        // TODO: skip if the property is typehinted with interface somehow.
+        // ReflectionResolver::resolveFromPropertyFetch
+        foreach ( $assignments as $assign ) {
+            if ( $assign->var instanceof Node\Expr\PropertyFetch ) {
+                return true;
+            }
+        }
+        return true;
+    }
+
     private function refactorParamTypeHint( Param $param ): void {
         $fullyQualified = new FullyQualified(
             $this->reflectionProvider->getClassName( $this->replaceWithInterface )
         );
-        if ($this->paramAnalyzer->isNullable($param)) {
+        if ( $this->paramAnalyzer->isNullable($param) ) {
             $param->type = new NullableType( $fullyQualified );
             return;
         }
