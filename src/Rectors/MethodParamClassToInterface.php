@@ -4,24 +4,24 @@ namespace Wikimedia\Rector\Rectors;
 
 use InvalidArgumentException;
 use PhpParser\Node;
-use PhpParser\Node\Expr\FuncCall;
+use PhpParser\Node\Name;
 use PhpParser\Node\Name\FullyQualified;
 use PhpParser\Node\NullableType;
 use PhpParser\Node\Param;
 use PhpParser\Node\Stmt\ClassMethod;
-use PHPStan\Analyser\ScopeFactory;
-use PHPStan\Reflection\ClassReflection;
 use PHPStan\Reflection\ParameterReflection;
 use PHPStan\Reflection\ParametersAcceptorSelector;
-use PHPStan\Reflection\ParametersAcceptorWithPhpDocs;
 use PHPStan\Reflection\ReflectionProvider;
+use PHPStan\Type\NullType;
 use PHPStan\Type\ObjectType;
-use PHPStan\Type\TypeWithClassName;
+use PHPStan\Type\UnionType;
+use Rector\BetterPhpDocParser\PhpDocManipulator\PhpDocTypeChanger;
 use Rector\Core\Contract\Rector\ConfigurableRectorInterface;
+use Rector\Core\Exception\ShouldNotHappenException;
 use Rector\Core\NodeAnalyzer\ParamAnalyzer;
 use Rector\Core\Rector\AbstractRector;
 use Rector\Core\Reflection\ReflectionResolver;
-use Rector\StaticTypeMapper\Naming\NameScopeFactory;
+use Rector\PHPStanStaticTypeMapper\ValueObject\TypeKind;
 use Symplify\RuleDocGenerator\ValueObject\CodeSample\CodeSample;
 use Symplify\RuleDocGenerator\ValueObject\RuleDefinition;
 
@@ -31,10 +31,10 @@ class MethodParamClassToInterface extends AbstractRector implements Configurable
 
     public const REPLACE_WITH_INTERFACE = 'interface';
 
-    /** @var ClassReflection */
+    /** @var string */
     private $replaceClass;
 
-    /** @var ClassReflection */
+    /** @var string */
     private $replaceWithInterface;
 
     /** @var ParamAnalyzer */
@@ -60,12 +60,12 @@ class MethodParamClassToInterface extends AbstractRector implements Configurable
         if ( !array_key_exists( self::REPLACE_CLASS, $configuration ) ) {
             throw new InvalidArgumentException( __CLASS__ . ' REPLACE_CLASS config is required' );
         }
-        $this->replaceClass = $this->reflectionProvider->getClass( $configuration[self::REPLACE_CLASS] );
+        $this->replaceClass = $configuration[self::REPLACE_CLASS];
 
         if ( !array_key_exists( self::REPLACE_WITH_INTERFACE, $configuration ) ) {
             throw new InvalidArgumentException( __CLASS__ . ' REPLACE_WITH_INTERFACE config is required' );
         }
-        $this->replaceWithInterface = $this->reflectionProvider->getClass( $configuration[self::REPLACE_WITH_INTERFACE] );
+        $this->replaceWithInterface = $configuration[self::REPLACE_WITH_INTERFACE];
     }
 
     public function getRuleDefinition(): \Symplify\RuleDocGenerator\ValueObject\RuleDefinition
@@ -79,11 +79,15 @@ class MethodParamClassToInterface extends AbstractRector implements Configurable
         return [ ClassMethod::class ];
     }
 
+    /**
+     * @param ClassMethod $method
+     */
     public function refactor( Node $method ) {
         $paramsToRefactor = $this->getParamsOfReplacedClass( $method );
         if ( !$paramsToRefactor ) {
             return null;
         }
+        $modified = false;
         foreach ( $paramsToRefactor as $param ) {
             if ( $this->callsMethodsNotInInterface( $method, $param ) ) {
                 continue;
@@ -92,8 +96,11 @@ class MethodParamClassToInterface extends AbstractRector implements Configurable
                 continue;
             }
             // Can be refactored!
+            $this->refactorParamDocBlock( $param, $method );
             $this->refactorParamTypeHint( $param );
+            $modified = true;
         }
+        return $modified ? $method : null;
     }
 
     /**
@@ -103,7 +110,7 @@ class MethodParamClassToInterface extends AbstractRector implements Configurable
     private function getParamsOfReplacedClass( Node $method ) {
         $result = [];
         foreach ( $method->getParams() as $param ) {
-            if ( $this->isObjectType( $param, new ObjectType( $this->replaceClass->getName() ) ) ) {
+            if ( $this->isObjectType( $param, new ObjectType( $this->replaceClass ) ) ) {
                 $result[] = $param;
             }
         }
@@ -115,12 +122,13 @@ class MethodParamClassToInterface extends AbstractRector implements Configurable
             return $node instanceof Node\Expr\MethodCall
                 && $this->nodeNameResolver->areNamesEqual( $node->var, $param );
         } );
+        $replaceWithInterface = $this->reflectionProvider->getClass( $this->replaceWithInterface );
         foreach ( $callsOnParam as $call ) {
-            if ( !$this->replaceWithInterface->hasMethod( $this->getName( $call->name ) ) ) {
-                return false;
+            if ( !$replaceWithInterface->hasMethod( $this->getName( $call->name ) ) ) {
+                return true;
             }
         }
-        return true;
+        return false;
     }
 
     private function passedToMethodsExpectingClass( Node $method, string $paramName ) {
@@ -139,21 +147,46 @@ class MethodParamClassToInterface extends AbstractRector implements Configurable
             foreach ( $parameters->getParameters() as $index => $param ) {
                 /** @var ParameterReflection $param */
                 if ( in_array( $index, $paramPositions ) &&
-                    !$param->getType()->equals( new ObjectType( $this->replaceClass->getName() ) )
+                    $param->getType()->equals( new ObjectType( $this->replaceClass ) )
                 ) {
-                    return false;
+                    return true;
                 }
             }
         }
-        return true;
+        return false;
     }
 
-    private function refactorParamTypeHint(Param $param) : void {
-        $fullyQualified = new FullyQualified( $this->replaceWithInterface->getName() );
+    private function refactorParamTypeHint( Param $param ): void {
+        $fullyQualified = new FullyQualified(
+            $this->reflectionProvider->getClassName( $this->replaceWithInterface )
+        );
         if ($this->paramAnalyzer->isNullable($param)) {
             $param->type = new NullableType( $fullyQualified );
             return;
         }
         $param->type = $fullyQualified;
+    }
+
+    private function refactorParamDocBlock( Param $param, ClassMethod $classMethod ) : void {
+        $paramName = $this->getName( $param->var );
+        if ( $paramName === null ) {
+            throw new ShouldNotHappenException();
+        }
+        $phpDocInfo = $this->phpDocInfoFactory->createFromNode( $classMethod );
+        if ( !$phpDocInfo ) {
+            return;
+        }
+
+        $paramTagValueNode = $phpDocInfo->getParamTagValueByName( $paramName );
+        if ( !$paramTagValueNode ) {
+            return;
+        }
+
+        $type = new ObjectType( $this->reflectionProvider->getClassName( $this->replaceWithInterface ) );
+        if ( $this->paramAnalyzer->isNullable( $param ) ) {
+            $type = new UnionType( [ $type, new NullType() ] );
+        }
+        $paramTagValueNode->type = $this->staticTypeMapper
+            ->mapPHPStanTypeToPHPStanPhpDocTypeNode( $type, TypeKind::PARAM() );;
     }
 }
