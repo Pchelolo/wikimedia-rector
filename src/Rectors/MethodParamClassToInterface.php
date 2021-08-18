@@ -11,6 +11,7 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PHPStan\Reflection\ParameterReflection;
 use PHPStan\Reflection\ParametersAcceptorSelector;
 use PHPStan\Reflection\ReflectionProvider;
+use PHPStan\Type\MixedType;
 use PHPStan\Type\NullType;
 use PHPStan\Type\ObjectType;
 use PHPStan\Type\UnionType;
@@ -48,9 +49,6 @@ class MethodParamClassToInterface extends AbstractRector implements Configurable
     /** @var ReflectionResolver */
     private $reflectionResolver;
 
-    /** @var PropertyTypeInferer */
-    private $propertyTypeInferer;
-
     public function __construct(
         ParamAnalyzer $paramAnalyzer,
         ReflectionProvider $reflectionProvider,
@@ -60,7 +58,6 @@ class MethodParamClassToInterface extends AbstractRector implements Configurable
         $this->paramAnalyzer = $paramAnalyzer;
         $this->reflectionProvider = $reflectionProvider;
         $this->reflectionResolver = $reflectionResolver;
-        $this->propertyTypeInferer = $propertyTypeInferer;
     }
 
     public function configure( array $configuration ): void {
@@ -75,11 +72,30 @@ class MethodParamClassToInterface extends AbstractRector implements Configurable
         $this->replaceWithInterface = $configuration[self::REPLACE_WITH_INTERFACE];
     }
 
-    public function getRuleDefinition(): \Symplify\RuleDocGenerator\ValueObject\RuleDefinition
+    public function getRuleDefinition(): RuleDefinition
     {
-        // TODO:
-        return new RuleDefinition( 'Remove deprecated properties', [
-            new CodeSample( 'TODO', 'TODO' ) ] );
+        return new RuleDefinition(
+            'Replace class parameter typehints with interface where possible',
+            [
+            new CodeSample(
+<<<'CODE_SAMPLE'
+class SomeClass
+{
+  public function method( TestClass $param ) {
+    $param->interfaceMethod();
+  }
+}
+CODE_SAMPLE
+                ,
+<<<'CODE_SAMPLE'
+class SomeClass
+{
+  public function method( TestInterface $param ) {
+    $param->interfaceMethod();
+  }
+}
+CODE_SAMPLE
+            ) ] );
     }
 
     public function getNodeTypes(): array {
@@ -202,7 +218,7 @@ class MethodParamClassToInterface extends AbstractRector implements Configurable
                 return true;
             }
         }
-        return true;
+        return false;
     }
 
     private function refactorParamTypeHint( Param $param ): void {
