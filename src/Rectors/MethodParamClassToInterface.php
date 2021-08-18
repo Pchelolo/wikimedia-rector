@@ -4,7 +4,6 @@ namespace Wikimedia\Rector\Rectors;
 
 use InvalidArgumentException;
 use PhpParser\Node;
-use PhpParser\Node\Name;
 use PhpParser\Node\Name\FullyQualified;
 use PhpParser\Node\NullableType;
 use PhpParser\Node\Param;
@@ -15,7 +14,6 @@ use PHPStan\Reflection\ReflectionProvider;
 use PHPStan\Type\NullType;
 use PHPStan\Type\ObjectType;
 use PHPStan\Type\UnionType;
-use Rector\BetterPhpDocParser\PhpDocManipulator\PhpDocTypeChanger;
 use Rector\Core\Contract\Rector\ConfigurableRectorInterface;
 use Rector\Core\Exception\ShouldNotHappenException;
 use Rector\Core\NodeAnalyzer\ParamAnalyzer;
@@ -26,6 +24,9 @@ use Rector\TypeDeclaration\TypeInferer\PropertyTypeInferer;
 use Symplify\RuleDocGenerator\ValueObject\CodeSample\CodeSample;
 use Symplify\RuleDocGenerator\ValueObject\RuleDefinition;
 
+/**
+ * @see \Wikimedia\Rector\Tests\Rectors\MethodParamClassToInterfaceTest
+ */
 class MethodParamClassToInterface extends AbstractRector implements ConfigurableRectorInterface {
 
     public const REPLACE_CLASS = 'class';
