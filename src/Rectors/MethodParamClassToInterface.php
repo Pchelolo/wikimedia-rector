@@ -25,9 +25,6 @@ use Rector\TypeDeclaration\TypeInferer\PropertyTypeInferer;
 use Symplify\RuleDocGenerator\ValueObject\CodeSample\CodeSample;
 use Symplify\RuleDocGenerator\ValueObject\RuleDefinition;
 
-/**
- * @see \Wikimedia\Rector\Tests\Rectors\MethodParamClassToInterfaceTest
- */
 class MethodParamClassToInterface extends AbstractRector implements ConfigurableRectorInterface {
 
     public const REPLACE_CLASS = 'class';

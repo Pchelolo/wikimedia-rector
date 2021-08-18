@@ -2,6 +2,7 @@
 
 use Rector\Core\Configuration\Option;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
+use Wikimedia\Rector\Rectors\MediaWiki1_37\MoveIDatabaseMethodsToResultWrapperRector;
 use Wikimedia\Rector\Rectors\MethodParamClassToInterface;
 use Wikimedia\Rector\Rectors\RemoveDeprecatedClassesRector;
 use Wikimedia\Rector\Rectors\RemoveDeprecatedMethodsRector;
@@ -19,7 +20,7 @@ return static function ( ContainerConfigurator $containerConfigurator ) : void {
         'includes/',
         'extensions/Echo/includes/',
 	] );
-    $parameters->set(Option::AUTO_IMPORT_NAMES, true);
+    // $parameters->set(Option::AUTO_IMPORT_NAMES, true);
 	$services = $containerConfigurator->services();
 
 	/*$services
@@ -32,10 +33,12 @@ return static function ( ContainerConfigurator $containerConfigurator ) : void {
 	$services->set( RemoveDeprecatedMethodsRector::class );
 	$services->set( RemoveDeprecatedPropertiesRector::class );*/
 
-    $services
+    /*$services
         ->set( MethodParamClassToInterface::class )
         ->call( 'configure', [[
             MethodParamClassToInterface::REPLACE_CLASS => 'User',
             MethodParamClassToInterface::REPLACE_WITH_INTERFACE => '\MediaWiki\User\UserIdentity',
-        ]] );
+        ]] );*/
+    $services
+        ->set( MoveIDatabaseMethodsToResultWrapperRector::class );
 };
