@@ -2,7 +2,7 @@
 
 namespace Wikimedia\Rector\Tests\Rectors\MethodParamClassToInterface\Fixture;
 
-class ClassWithoutTestClassParam {
+class NoTestClassParam {
     /**
      * @param int $i
      * @param string $s
