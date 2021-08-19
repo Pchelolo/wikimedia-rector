@@ -52,19 +52,31 @@ CODE_SAMPLE
         switch ( $this->getName( $node->name ) ) {
             case 'fetchObject':
             case 'fetchRow':
-            case 'numRows': // TODO: handle possibility $res is null
-                return $this->replaceFetch( $node );
-                break;
-            case 'freeResult': // TODO: Use IResultWrapper::free()
-            case 'dataSeek': // TODO: IResultWrapper::seek()
+                $node->var = $node->args[0]->value;
+                $node->args = [];
+                return $node;
+            case 'numRows': // TODO: handle possibility $res is false
+                return new Node\Expr\Ternary(
+                    $node->args[0]->value,
+                    new Node\Expr\MethodCall(
+                        $node->args[0]->value,
+                        new Node\Identifier('numRows')
+                    ),
+                    new Node\Scalar\LNumber(0)
+                );
+                return $node;
+            case 'freeResult':
+                $node->var = $node->args[0]->value;
+                $node->args = [];
+                $node->name = new Node\Identifier( 'free' );
+                return $node;
+            case 'dataSeek':
+                $node->var = $node->args[0]->value;
+                $node->args = [ $node->args[1] ];
+                $node->name = new Node\Identifier( 'seek' );
+                return $node;
             default:
                 return null;
         }
-    }
-
-    private function replaceFetch( Node\Expr\MethodCall $call ): Node {
-        $call->var = $call->args[0]->value;
-        $call->args = [];
-        return $call;
     }
 }

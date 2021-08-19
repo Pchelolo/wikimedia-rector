@@ -13,7 +13,8 @@ return static function ( ContainerConfigurator $containerConfigurator ) : void {
 	$parameters = $containerConfigurator->parameters();
 	$parameters->set( Option::BOOTSTRAP_FILES, [
 	    'includes/AutoLoader.php',
-        'vendor/autoload.php'
+        'vendor/autoload.php',
+        'includes/Defines.php'
     ] );
 	$parameters->set( Option::AUTOLOAD_PATHS, [
 	    //__DIR__ . '/test_code',

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a83302a0ef31ca6157bcf6cd628461b8",
+    "content-hash": "2a529658aadef8fbacfd6d618bfd86cb",
     "packages": [
         {
             "name": "phpstan/phpstan",
@@ -199,6 +199,54 @@
                 }
             ],
             "time": "2020-11-10T18:47:58+00:00"
+        },
+        {
+            "name": "matthiasnoback/php-parser-instantiation-printer",
+            "version": "v0.2.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/matthiasnoback/php-parser-instantiation-printer.git",
+                "reference": "20b933e0d4412740138fa5212a84916bb60c011b"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/matthiasnoback/php-parser-instantiation-printer/zipball/20b933e0d4412740138fa5212a84916bb60c011b",
+                "reference": "20b933e0d4412740138fa5212a84916bb60c011b",
+                "shasum": ""
+            },
+            "require": {
+                "nikic/php-parser": "^4.10",
+                "php": "^7.4|^8.0"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^9.4",
+                "symfony/process": "^5.1",
+                "symfony/var-dumper": "^5.1"
+            },
+            "bin": [
+                "bin/print-node-instantiation-code"
+            ],
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "InstantiationPrinter\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Matthias Noback",
+                    "email": "matthiasnoback@gmail.com"
+                }
+            ],
+            "support": {
+                "issues": "https://github.com/matthiasnoback/php-parser-instantiation-printer/issues",
+                "source": "https://github.com/matthiasnoback/php-parser-instantiation-printer/tree/v0.2.0"
+            },
+            "time": "2021-01-10T10:20:40+00:00"
         },
         {
             "name": "myclabs/deep-copy",
